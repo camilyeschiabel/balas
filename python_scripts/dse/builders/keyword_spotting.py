@@ -6,6 +6,19 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 
 
+# Chaves canônicas do grid em configs/kws.toml.
+GRID_KEYS = (
+    "first_conv_channels",
+    "first_kernel_row",
+    "first_kernel_col",
+    "ds_channels",
+    "ds_kernel_size",
+)
+
+# Nomes antigos, mantidos como fallback para configs ja existentes.
+LEGACY_GRID_KEYS = ("channels", "kernel", "first_kernel")
+
+
 def _parse_first_kernel(first_kernel_param) -> tuple[int, int]:
     """Converte parâmetros de filtro como '10x4' ou [10, 4] para tupla (10, 4)."""
     if isinstance(first_kernel_param, (list, tuple)):
@@ -15,6 +28,21 @@ def _parse_first_kernel(first_kernel_param) -> tuple[int, int]:
         return int(parts[0]), int(parts[1])
     k = int(first_kernel_param)
     return k, k
+
+
+def _resolve_first_kernel(config: dict) -> tuple[int, int]:
+    """Resolve (linhas, colunas) do kernel retangular da primeira convolução.
+
+    Usa as chaves canônicas `first_kernel_row`/`first_kernel_col` do grid e, na
+    ausência delas, recorre à forma legada `first_kernel` ('10x4' ou [10, 4]).
+    """
+    row = config.get("first_kernel_row")
+    col = config.get("first_kernel_col")
+    legacy_h, legacy_w = _parse_first_kernel(config.get("first_kernel", "10x4"))
+
+    resolved_h = legacy_h if row is None else int(row)
+    resolved_w = legacy_w if col is None else int(col)
+    return resolved_h, resolved_w
 
 
 def build_and_quantize_model(
@@ -27,28 +55,30 @@ def build_and_quantize_model(
     """Constrói o modelo Keras de Keyword Spotting (DS-CNN Áudio) e quantiza para .tflite int8."""
     tf.keras.backend.clear_session()
 
-    channels = int(config.get("channels", 64))
-    kernel_size = int(config.get("kernel", 3))
-    first_k_h, first_k_w = _parse_first_kernel(config.get("first_kernel", "10x4"))
+    # Canônicas do grid (configs/kws.toml), com fallback para os nomes legados.
+    first_channels = int(config.get("first_conv_channels", config.get("channels", 64)))
+    ds_channels = int(config.get("ds_channels", config.get("channels", first_channels)))
+    kernel_size = int(config.get("ds_kernel_size", config.get("kernel", 3)))
+    first_k_h, first_k_w = _resolve_first_kernel(config)
 
     inputs = tf.keras.Input(shape=input_shape, name="input")
 
     # Primeira Convolução Retangular para Áudio
     x = tf.keras.layers.Conv2D(
-        channels, (first_k_h, first_k_w), strides=(2, 1), padding="same", activation="relu"
+        first_channels, (first_k_h, first_k_w), strides=(2, 1), padding="same", activation="relu"
     )(inputs)
 
     # Bloco DS-CNN 1
     x = tf.keras.layers.DepthwiseConv2D(
         (kernel_size, kernel_size), padding="same", activation="relu"
     )(x)
-    x = tf.keras.layers.Conv2D(channels, (1, 1), padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(ds_channels, (1, 1), padding="same", activation="relu")(x)
 
     # Bloco DS-CNN 2
     x = tf.keras.layers.DepthwiseConv2D(
         (kernel_size, kernel_size), padding="same", activation="relu"
     )(x)
-    x = tf.keras.layers.Conv2D(channels, (1, 1), padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(ds_channels, (1, 1), padding="same", activation="relu")(x)
 
     x = tf.keras.layers.GlobalAveragePooling2D()(x)
     outputs = tf.keras.layers.Dense(num_classes, name="logits")(x)

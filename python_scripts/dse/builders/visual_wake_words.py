@@ -5,6 +5,18 @@ import numpy as np
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 
+
+# Chaves canônicas do grid em configs/vww.toml.
+GRID_KEYS = (
+    "initial_channels",
+    "channels_multiplier",
+    "kernel_size",
+)
+
+# Nomes antigos, mantidos como fallback para configs ja existentes.
+LEGACY_GRID_KEYS = ("kernel",)
+
+
 def build_and_quantize_model(
     config: dict,
     variant_name: str,

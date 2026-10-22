@@ -17,7 +17,7 @@ from python_scripts.mac_calculator.mac_calculator import count_macs
 from python_scripts.profiler.profiler import send_array_and_get_int
 
 # Imports do pacote modular DSE
-from python_scripts.dse.builders import get_builder_module
+from python_scripts.dse.builders import get_builder_module, validate_grid
 from python_scripts.dse.checkpoint import CheckpointManager
 from python_scripts.dse.config_loader import load_dse_config
 from python_scripts.dse.hashing import sample_hyperparameters_for_seed
@@ -78,6 +78,10 @@ def main():
     # 5. Resolve o gerador de modelos (builder) dinamicamente
     benchmark_name = args.benchmark or dse_cfg.get("benchmark", "cifar_ten")
     builder_module = get_builder_module(benchmark_name)
+
+    # 5.1 Confere se o grid do TOML bate com as chaves que o builder entende
+    for grid_warning in validate_grid(builder_module, dse_cfg["grid"]):
+        print(f"⚠️  {grid_warning}")
 
     # 6. Prepara o gerenciador de checkpoint e banco de dados CSV/JSON
     checkpoint = CheckpointManager(dse_cfg["output_csv"], dse_cfg["output_map"])

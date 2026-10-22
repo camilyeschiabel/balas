@@ -20,3 +20,33 @@ def get_builder_module(benchmark_name: str) -> ModuleType:
 
     module_path = BUILDER_MAP[benchmark_name]
     return importlib.import_module(module_path)
+
+
+def validate_grid(builder_module: ModuleType, grid: dict) -> list[str]:
+    """Compara as chaves do grid do TOML com as chaves declaradas pelo builder.
+
+    Retorna uma lista de avisos legíveis. Sem essa checagem, um grid
+    desalinhado do builder é ignorado em silêncio: o modelo sai sempre com os
+    valores default e o espaço de busca real fica menor do que o anunciado.
+    """
+    declared = set(getattr(builder_module, "GRID_KEYS", ()))
+    legacy = set(getattr(builder_module, "LEGACY_GRID_KEYS", ()))
+    if not declared:
+        return []
+
+    builder_name = builder_module.__name__.rsplit(".", 1)[-1]
+    warnings = []
+
+    unknown = sorted(set(grid) - declared - legacy)
+    if unknown:
+        warnings.append(
+            f"chaves do grid ignoradas pelo builder '{builder_name}': {unknown}"
+        )
+
+    missing = sorted(declared - set(grid))
+    if missing:
+        warnings.append(
+            f"chaves ausentes no grid, o builder '{builder_name}' usara os valores default: {missing}"
+        )
+
+    return warnings

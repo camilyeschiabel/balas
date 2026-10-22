@@ -6,6 +6,14 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import tensorflow as tf
 
 
+# Chaves canônicas do grid em configs/ad.toml.
+GRID_KEYS = (
+    "large_fc",
+    "medium_fc",
+    "small_fc",
+)
+
+
 def build_and_quantize_model(
     config: dict,
     variant_name: str,

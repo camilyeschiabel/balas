@@ -1,4 +1,5 @@
 
+import csv
 import json
 from pathlib import Path
 import time
@@ -93,3 +94,54 @@ class CheckpointManager:
         self.map_path.parent.mkdir(parents=True, exist_ok=True)
         self.map_path.write_text(json.dumps(self.hash_map, indent=2), encoding="utf-8")
         self.completed_hashes.add(hash_id)
+
+    def get_iteration_row(self, iteration: int) -> dict | None:
+        """Retorna a linha do CSV correspondente ao iteration_index informado, se existir."""
+        if not self.csv_path.exists():
+            return None
+        target = str(iteration)
+        with self.csv_path.open("r", newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                if str(row.get("iteration_index", "")).strip() == target:
+                    return row
+        return None
+
+    def rollback_iteration(self, iteration: int) -> int:
+        """Remove do CSV e do JSON map os registros associados ao iteration_index informado."""
+        target = str(iteration)
+        removed_rows = 0
+
+        if self.csv_path.exists():
+            kept_rows = []
+            with self.csv_path.open("r", newline="", encoding="utf-8") as handle:
+                reader = csv.DictReader(handle)
+                fieldnames = reader.fieldnames or CSV_FIELDNAMES
+                for row in reader:
+                    if str(row.get("iteration_index", "")).strip() == target:
+                        removed_rows += 1
+                    else:
+                        kept_rows.append(row)
+
+            if removed_rows > 0:
+                with self.csv_path.open("w", newline="", encoding="utf-8") as handle:
+                    writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(kept_rows)
+
+        if self.map_path.exists():
+            self._load_state()
+            hashes_to_remove = [
+                h
+                for h, meta in self.hash_map.items()
+                if str(meta.get("iteration_index", "")).strip() == target
+            ]
+            if hashes_to_remove:
+                for h in hashes_to_remove:
+                    self.hash_map.pop(h, None)
+                    self.completed_hashes.discard(h)
+                self.map_path.write_text(
+                    json.dumps(self.hash_map, indent=2), encoding="utf-8"
+                )
+
+        return removed_rows

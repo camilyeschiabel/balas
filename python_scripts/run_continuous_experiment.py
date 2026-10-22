@@ -49,6 +49,12 @@ def main():
         help="Número máximo de iterações para esta execução.",
     )
     parser.add_argument(
+        "--iteration-index",
+        type=int,
+        default=None,
+        help="Executa apenas o índice de iteração especificado (0-based).",
+    )
+    parser.add_argument(
         "--serial-device",
         default=None,
         help="Porta serial do microcontrolador (ex: /dev/ttyACM2). Se omitido, usa a porta do ambiente.",
@@ -106,11 +112,11 @@ def main():
     print(f"📄 Salvando resultados em: {dse_cfg['output_csv']}")
     print(f"🔑 Salvando mapeamento de hashes em: {dse_cfg['output_map']}\n")
 
-    iteration = 0
+    iteration = args.iteration_index if args.iteration_index is not None else 0
     try:
         while True:
             # Verifica se atingiu o limite de iterações configurado
-            if args.max_iterations and iteration >= args.max_iterations:
+            if args.iteration_index is None and args.max_iterations is not None and iteration >= args.max_iterations:
                 print(f"🏁 Alcançado limite máximo de {args.max_iterations} iterações.")
                 break
 
@@ -121,6 +127,11 @@ def main():
 
             # --- CHECKPOINT: Se o Hash já foi testado, PULA ---
             if checkpoint.is_completed(hash_id):
+                if args.iteration_index is not None:
+                    print(
+                        f"⏭️  Modelo #{iteration+1} (iteration_index={iteration}, Hash: {hash_id}) já consta no histórico. Pulando."
+                    )
+                    break
                 iteration += 1
                 continue
 
@@ -188,6 +199,8 @@ def main():
 
             iteration += 1
             print("-" * 75)
+            if args.iteration_index is not None:
+                break
 
     except KeyboardInterrupt:
         print("\n\n🛑 Interrupção pelo usuário (Ctrl+C).")

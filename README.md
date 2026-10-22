@@ -110,3 +110,33 @@ será pulada. Por isso, convém rodar o comando antes do teste oficial pra ver s
 não funciona, e a partir do momento que tudo estiver de acordo, apagar os .csvs gerados e começar de novo.
 
 Isso será "corrigido" em um futuro próximo.
+
+
+## Execução de todos os benchmarks (`run_all_benchmarks.py`)
+
+O script `run_all_benchmarks.py` funciona como um wrapper para o `run_continuous_experiment.py`, executando sequencialmente todos os arquivos `.toml` presentes na raiz do diretório `configs/`.
+
+Caso ocorra um erro crítico em qualquer um dos benchmarks durante uma iteração (como falha no `deploy.sh` ou erro na leitura na porta serial), todas as linhas dos `.csv` e entradas dos `_map.json` referentes àquela iteração são apagadas e a mesma iteração é tentada novamente. Erros de `compile.sh` são mantidos normalmente, pois indicam que a arena/modelo excedeu a memória FLASH/RAM da placa.
+
+```bash
+uv run run_all_benchmarks.py \
+    --batch-size 10 \
+    --configs-dir configs \
+    --results-dir results \
+    --target nxp \
+    --serial-device /dev/ttyACM0 \
+    --profiling-samples 10 \
+    --max-iterations 1000 \
+    --retry-delay 5.0
+```
+
+### Flags e valores padrão
+
+- `--batch-size`: Quantidade de iterações completas antes de copiar os arquivos `.csv` e `.json` gerados em `artifacts/` para o diretório oficial de resultados (padrão: `10`).
+- `--configs-dir`: Diretório onde o script busca os arquivos `.toml` apenas no primeiro nível, ignorando subpastas (padrão: `configs`).
+- `--results-dir`: Diretório na raiz do repositório para onde os arquivos de resultados oficiais são copiados a cada lote de `--batch-size` iterações (padrão: `results`).
+- `--target`: Placa alvo (`nxp`, `stm32`, `nordic`). Se omitido, utiliza o valor de `BALAS_TARGET` configurado no ambiente/ `.balas.env` (padrão: `None` -> `BALAS_TARGET` ou `nxp`).
+- `--serial-device`: Porta serial do microcontrolador. Se omitido, utiliza a porta configurada no `.toml` ou em `BALAS_SERIAL_PORT` (padrão: `None` -> `BALAS_SERIAL_PORT` ou `/dev/ttyACM0`).
+- `--profiling-samples`: Quantidade de amostras enviadas via serial por modelo testado. Se omitido, utiliza o `profiling_samples` definido em cada `.toml` (padrão: `None` -> `10` nos arquivos `.toml`).
+- `--max-iterations`: Limite máximo de iterações a serem executadas. Se omitido, roda continuamente até ser interrompido com `Ctrl+C` (padrão: `None`).
+- `--retry-delay`: Tempo de espera em segundos antes de tentar novamente a iteração atual após um erro crítico e rollback (padrão: `5.0`).

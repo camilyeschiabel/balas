@@ -3,7 +3,7 @@ import json
 
 def generate_hp_hash(hp_list: list) -> str:
     hp_str = json.dumps(hp_list)
-    return hashlib.md5(hp_str.encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha1(hp_str.encode("utf-8")).hexdigest()[:16]
 
 def sample_hyperparameters_for_seed(grid: dict, seed: int) -> tuple[dict, list, str, str]:
     config = {}

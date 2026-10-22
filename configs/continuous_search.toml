@@ -1,17 +1,36 @@
+# Busca contínua reduzida para iterações rápidas.
+# Para o espaço completo, use configs/cifar_10.toml.
+# Para o ponto exato de referência, use configs/cifar_10_reference.toml.
+
 [experiment]
 name = "continuous_dse_image_classification"
+benchmark = "cifar_ten"
 base_seed = 1000
 profiling_samples = 10
 output_csv = "artifacts/continuous_database.csv"
 output_map = "artifacts/hyperparameters_map.json"
 
 [hyperparameters.grid]
-channels_1 = [8, 16, 24, 32, 48, 64]
+# Stem + estágio 1.
+channels_1 = [8, 16, 32]
 kernel_1 = [3, 5]
-channels_2 = [16, 32, 48, 64]
+blocks_1 = [1, 2]
+stride_1 = [1, 2]
+block_type_1 = ["basic", "bottleneck_2"]
+
+# Estágio 2 (mantém o downsampling no primeiro bloco).
+channels_2 = [16, 32, 64]
 kernel_2 = [3, 5]
-channels_3 = [32, 64, 96, 128]
-kernel_3 = [2, 3]
+blocks_2 = [1, 2]
+stride_2 = [2]
+block_type_2 = ["basic", "bottleneck_2"]
+
+# Estágio 3 (mantém o downsampling no primeiro bloco).
+channels_3 = [32, 64, 128]
+kernel_3 = [3, 5]
+blocks_3 = [1, 2]
+stride_3 = [2]
+block_type_3 = ["basic", "bottleneck_2"]
 
 [model_specs]
 input_shape = [32, 32, 3]

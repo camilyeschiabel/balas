@@ -7,12 +7,88 @@ output_csv = "artifacts/cifar_10_database.csv"
 output_map = "artifacts/cifar_10_map.json"
 
 [hyperparameters.grid]
-channels_1 = [8, 12, 16, 20, 24, 32, 40, 48, 64]
-kernel_1 = [3, 5]
-channels_2 = [16, 24, 32, 40, 48, 64, 80, 96]
-kernel_2 = [3, 5]
-channels_3 = [32, 48, 64, 80, 96, 112, 128, 160, 192, 256]
-kernel_3 = [2, 3, 5]
+# ---------------------------------------------------------------------------
+# RESNET8 CONFIGURÁVEL
+# ---------------------------------------------------------------------------
+# O grid ativo varia apenas os pares canal/kernel. As chaves topológicas
+# (blocks, stride e block_type) ficam comentadas abaixo para preservar o
+# esqueleto do ResNet8. Sem elas, o builder usa os defaults de referência:
+#   blocks=1, strides=1/2/2, block_type=basic.
+#
+# Fixos: BatchNorm após cada Conv, ReLU, atalho automático (identity quando
+# os shapes já batem; Conv1x1 caso contrário), AveragePooling global, Dense
+# softmax e calibração int8 com 100 amostras sintéticas.
+#
+# Grid ativo: 258552 combinações (18 * 3 * 19 * 3 * 21 * 4).
+# Se as chaves topológicas forem descomentadas, o produto bruto sobe para
+# 132378624 combinações (258552 * 2^9).
+#
+# O ponto de referência do MLPerf Tiny é channels 16/32/64, kernel 3,
+# blocks 1, strides 1/2/2 e block_type basic.
+
+# ---------------------------------------------------------------------------
+# CANAIS E KERNELS (VARIAÇÕES NUMÉRICAS)
+# ---------------------------------------------------------------------------
+# Canais do stem e do estágio 1. O stem usa a mesma largura do estágio 1 para
+# reproduzir o ResNet8 de referência (16 canais). Aumenta MACs, parâmetros e arena.
+channels_1 = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 112, 128]
+
+# Kernel do stem e dos convs do estágio 1. 3 = referência; 5 e 7 aumentam o
+# receptive field e o custo.
+kernel_1 = [3, 5, 7]
+
+# Canais do estágio 2. 32 = referência (dobra em relação ao estágio 1).
+channels_2 = [8, 12, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 80, 96, 112, 128, 144, 160]
+
+# Kernel dos convs do estágio 2. 3 = referência; 5 e 7 aumentam o custo.
+kernel_2 = [3, 5, 7]
+
+# Canais do estágio 3. 64 = referência (dobra em relação ao estágio 2).
+channels_3 = [16, 24, 32, 40, 48, 56, 64, 72, 80, 96, 112, 128, 144, 160, 192, 224, 256, 320, 384, 448, 512]
+
+# Kernel dos convs do estágio 3. 3 = referência; 2 reduz o custo; 5 e 7
+# aumentam o receptive field.
+kernel_3 = [2, 3, 5, 7]
+
+# ---------------------------------------------------------------------------
+# KNOBS TOPOLÓGICOS (COMENTADOS)
+# ---------------------------------------------------------------------------
+# Os valores abaixo alteram a estrutura do grafo. Eles continuam registrados
+# aqui, mas comentados para que o grid ativo preserve a topologia do ResNet8.
+# Descomente apenas as linhas que você quer incluir na busca.
+#
+# Se uma chave for omitida, o builder usa o valor de referência:
+#   blocks=1, stride de referência do estágio e block_type=basic.
+
+# Estágio 1
+# Quantidade de blocos residuais. 1 = referência; 2 adiciona profundidade e
+# mais um Add.
+# blocks_1 = [1, 2]
+# Stride do primeiro bloco. 1 = referência (mantém a resolução que veio do
+# stem); 2 faz downsampling já no estágio 1.
+# stride_1 = [1, 2]
+# Tipo de bloco:
+#   "basic"        -> dois convs (kernel_1 x kernel_1).
+#   "bottleneck_2" -> 1x1 reduz para channels_1/2, kernel espacial, 1x1 expande.
+# block_type_1 = ["basic", "bottleneck_2"]
+
+# Estágio 2
+# Quantidade de blocos residuais. 1 = referência; 2 adiciona profundidade.
+# blocks_2 = [1, 2]
+# Stride do primeiro bloco. 2 = referência (16x16); 1 mantém a resolução
+# anterior e aumenta os MACs.
+# stride_2 = [1, 2]
+# Tipo de bloco. Ver comentário de block_type_1.
+# block_type_2 = ["basic", "bottleneck_2"]
+
+# Estágio 3
+# Quantidade de blocos residuais. 1 = referência; 2 adiciona profundidade.
+# blocks_3 = [1, 2]
+# Stride do primeiro bloco. 2 = referência (8x8); 1 mantém a resolução
+# anterior e aumenta os MACs.
+# stride_3 = [1, 2]
+# Tipo de bloco. Ver comentário de block_type_1.
+# block_type_3 = ["basic", "bottleneck_2"]
 
 [model_specs]
 input_shape = [32, 32, 3]
